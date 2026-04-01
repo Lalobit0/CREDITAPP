@@ -153,7 +153,7 @@ input, select, button, textarea { font-family: inherit; }
 <body>
 
 <!-- CONFIG -->
- <div id="config-screen">
+<div id="config-screen">
   <h1>CreditoApp</h1>
   <p>Ingresa tu contraseña para continuar.</p>
   <div class="config-box">
@@ -162,7 +162,7 @@ input, select, button, textarea { font-family: inherit; }
     <div id="pin-error" style="color:#f87171;font-size:12px;margin-top:8px;display:none;">Contraseña incorrecta</div>
     <button class="btn-primary" onclick="conectar()">Entrar</button>
   </div>
- </div>
+</div>
 
 <!-- APP -->
 <div id="app">
@@ -256,10 +256,6 @@ input, select, button, textarea { font-family: inherit; }
 <button class="fab" id="fab" onclick="fabAction()">+</button>
 
 <script>
-const SB_URL = 'https://ivpxysaqjuwfpwexurfj.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cHh5c2FxanV3ZnB3ZXh1cmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNzg2MTksImV4cCI6MjA5MDY1NDYxOX0.U6WdqD_OCdAWGaN4lR3TlEYHCO3AxTQDk-wtRSdW3WY';
-const APP_PASS = 'Karina.2025';
-
 const SQL_SETUP = `
 -- Ejecuta esto en Supabase → SQL Editor
 
@@ -326,6 +322,9 @@ const PLAZOS = [
   {l:'6 meses',n:6,t:'mes'},
 ];
 
+const SB_URL = 'https://ivpxysaqjuwfpwexurfj.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cHh5c2FxanV3ZnB3ZXh1cmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNzg2MTksImV4cCI6MjA5MDY1NDYxOX0.U6WdqD_OCdAWGaN4lR3TlEYHCO3AxTQDk-wtRSdW3WY';
+const APP_PASS = 'Karina.2025';
 let sb = null;
 let currentView = 'dashboard';
 let selProd = null, selPlazo = null;
@@ -353,7 +352,6 @@ function desconectar() {
   localStorage.removeItem('autenticado');
   location.reload();
 }
-
 
 async function cargarTodo() {
   const [c, v, p] = await Promise.all([
