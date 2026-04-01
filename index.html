@@ -256,6 +256,10 @@ input, select, button, textarea { font-family: inherit; }
 <button class="fab" id="fab" onclick="fabAction()">+</button>
 
 <script>
+const SB_URL = 'https://ivpxysaqjuwfpwexurfj.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cHh5c2FxanV3ZnB3ZXh1cmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNzg2MTksImV4cCI6MjA5MDY1NDYxOX0.U6WdqD_OCdAWGaN4lR3TlEYHCO3AxTQDk-wtRSdW3WY';
+const APP_PASS = 'Karina.2025';
+
 const SQL_SETUP = `
 -- Ejecuta esto en Supabase → SQL Editor
 
@@ -332,10 +336,6 @@ function fmt(n) { return '$' + Math.round(n||0).toLocaleString('es-MX'); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}); }
 
 // CONFIG
-const SB_URL = 'https://ivpxysaqjuwfpwexurfj.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cHh5c2FxanV3ZnB3ZXh1cmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNzg2MTksImV4cCI6MjA5MDY1NDYxOX0.U6WdqD_OCdAWGaN4lR3TlEYHCO3AxTQDk-wtRSdW3WY';
-const APP_PASS = 'Karina.2025';
-
 function conectar() {
   const pin = document.getElementById('cfg-pin').value;
   if (pin !== APP_PASS) {
