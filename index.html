@@ -344,14 +344,19 @@ function fmt(n) { return '$' + Math.round(n||0).toLocaleString('es-MX'); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}); }
 
 // CONFIG
+const SB_URL = 'https://ivpxysaqjuwfpwexurfj.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cHh5c2FxanV3ZnB3ZXh1cmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNzg2MTksImV4cCI6MjA5MDY1NDYxOX0.U6WdqD_OCdAWGaN4lR3TlEYHCO3AxTQDk-wtRSdW3WY';
+const APP_PASS = 'Karina.2025';
+
 function conectar() {
-  const url = document.getElementById('cfg-url').value.trim();
-  const key = document.getElementById('cfg-key').value.trim();
-  if (!url || !key) { toast('Ingresa URL y clave'); return; }
+  const pin = document.getElementById('cfg-pin').value;
+  if (pin !== APP_PASS) {
+    document.getElementById('pin-error').style.display = 'block';
+    return;
+  }
   try {
-    sb = supabase.createClient(url, key);
-    localStorage.setItem('sb_url', url);
-    localStorage.setItem('sb_key', key);
+    sb = supabase.createClient(SB_URL, SB_KEY);
+    localStorage.setItem('autenticado', '1');
     document.getElementById('config-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     cargarTodo();
@@ -359,7 +364,7 @@ function conectar() {
 }
 
 function desconectar() {
-  localStorage.removeItem('sb_url'); localStorage.removeItem('sb_key');
+  localStorage.removeItem('autenticado');
   location.reload();
 }
 
@@ -767,12 +772,11 @@ document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('cli
 
 // AUTO CONECTAR
 window.addEventListener('load', () => {
-  const url = localStorage.getItem('sb_url');
-  const key = localStorage.getItem('sb_key');
-  if (url && key) {
-    document.getElementById('cfg-url').value = url;
-    document.getElementById('cfg-key').value = key;
-    conectar();
+  if (localStorage.getItem('autenticado') === '1') {
+    sb = supabase.createClient(SB_URL, SB_KEY);
+    document.getElementById('config-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    cargarTodo();
   }
 });
 </script>
