@@ -308,7 +308,7 @@ create table pagos (
   fecha timestamptz default now()
 );`;
 
-document.getElementById('sql-block').textContent = SQL_SETUP;
+// sql block removed
 
 const PRODUCTOS = [
   {n:'iPhone 16 Pro Max',p:14999},{n:'iPhone 16 Pro',p:13499},
@@ -322,10 +322,10 @@ const PLAZOS = [
   {l:'6 meses',n:6,t:'mes'},
 ];
 
-const SB_URL = 'https://ivpxysaqjuwfpwexurfj.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cHh5c2FxanV3ZnB3ZXh1cmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNzg2MTksImV4cCI6MjA5MDY1NDYxOX0.U6WdqD_OCdAWGaN4lR3TlEYHCO3AxTQDk-wtRSdW3WY';
-const APP_PASS = 'Karina.2025';
-let sb = null;
+var SB_URL = 'https://ivpxysaqjuwfpwexurfj.supabase.co';
+var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cHh5c2FxanV3ZnB3ZXh1cmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNzg2MTksImV4cCI6MjA5MDY1NDYxOX0.U6WdqD_OCdAWGaN4lR3TlEYHCO3AxTQDk-wtRSdW3WY';
+var APP_PASS = 'Karina.2025';
+var sb = null;
 let currentView = 'dashboard';
 let selProd = null, selPlazo = null;
 let clientes = [], ventas = [], prestamos_data = [];
@@ -336,20 +336,20 @@ function fmtDate(d) { return new Date(d).toLocaleDateString('es-MX',{day:'2-digi
 
 // CONFIG
 function conectar() {
-  const pin = document.getElementById('cfg-pin').value;
+  var pin = document.getElementById('cfg-pin').value;
   if (pin !== APP_PASS) {
     document.getElementById('pin-error').style.display = 'block';
     return;
   }
   sb = supabase.createClient(SB_URL, SB_KEY);
-  localStorage.setItem('autenticado', '1');
+  localStorage.setItem('loggedIn', '1');
   document.getElementById('config-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   cargarTodo();
 }
 
 function desconectar() {
-  localStorage.removeItem('autenticado');
+  localStorage.removeItem('loggedIn');
   location.reload();
 }
 
@@ -757,7 +757,7 @@ document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('cli
 
 // AUTO CONECTAR
 window.addEventListener('load', () => {
-  if (localStorage.getItem('autenticado') === '1') {
+  if (localStorage.getItem('loggedIn') === '1') {
     sb = supabase.createClient(SB_URL, SB_KEY);
     document.getElementById('config-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
