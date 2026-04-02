@@ -337,12 +337,13 @@ function navTo(v){
   var el=document.getElementById('nav-'+v);if(el)el.classList.add('active');
   var subs={dashboard:'Inicio',cobros:'Cobros',ventas:'Créditos Apple',prestamos:'Préstamos'};
   document.getElementById('topbar-sub').textContent=subs[v]||'';
-  document.getElementById('fab').style.display=v==='dashboard'?'none':'flex';
+  document.getElementById('fab').style.display='flex';
   renderView();
 }
 
 function fabAction(){
-  if(view==='cobros'){if(deudorId)openMovModal(deudorId,null);else openDeudorModal(null);}
+  if(view==='dashboard')abrirNuevoCliente();
+  else if(view==='cobros'){if(deudorId)openMovModal(deudorId,null);else openDeudorModal(null);}
   else if(view==='ventas')abrirModalVenta();
   else if(view==='prestamos')abrirModalPrestamo();
 }
@@ -357,51 +358,119 @@ function renderView(){
 
 // DASHBOARD
 function renderDashboard(){
+  var n=new Date();
+  var startOfWeek=new Date(n);startOfWeek.setDate(n.getDate()-n.getDay());startOfWeek.setHours(0,0,0,0);
+  var startOfMonth=new Date(n.getFullYear(),n.getMonth(),1);
+
   var totalDeuda=deudores.reduce(function(s,d){return s+(d.saldo_actual||0);},0);
+  var deudoresActivos=deudores.filter(function(d){return d.saldo_actual>0;}).length;
+  var deudoresLiquidados=deudores.filter(function(d){return d.saldo_actual<=0;}).length;
+
   var cobSem=movimientos.filter(function(m){
-    var d=new Date(m.fecha),n=new Date();
-    var startOfWeek=new Date(n);startOfWeek.setDate(n.getDate()-n.getDay());
+    var d=new Date(m.fecha+'T12:00:00');
     return d>=startOfWeek&&m.tipo==='abono';
   }).reduce(function(s,m){return s+m.monto;},0);
-  var cobMes=movimientos.filter(function(m){
-    var d=new Date(m.fecha),n=new Date();
-    return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()&&m.tipo==='abono';
-  }).reduce(function(s,m){return s+m.monto;},0);
-  var totalMultas=movimientos.filter(function(m){return m.tipo==='multa';}).reduce(function(s,m){return s+m.monto;},0);
-  var ganCreditos=ventas.reduce(function(s,v){return s+(v.ganancia||0);},0)+prestamos.reduce(function(s,p){return s+(p.ganancia||0);},0);
 
-  var recientes=movimientos.slice(0,4);
-  return '<div class="section-title">Esta semana / este mes</div>'+
+  var cobMes=movimientos.filter(function(m){
+    var d=new Date(m.fecha+'T12:00:00');
+    return d>=startOfMonth&&m.tipo==='abono';
+  }).reduce(function(s,m){return s+m.monto;},0);
+
+  var multasMes=movimientos.filter(function(m){
+    var d=new Date(m.fecha+'T12:00:00');
+    return d>=startOfMonth&&m.tipo==='multa';
+  }).reduce(function(s,m){return s+m.monto;},0);
+
+  var totalMultas=movimientos.filter(function(m){return m.tipo==='multa';}).reduce(function(s,m){return s+m.monto;},0);
+  var ganVentas=ventas.reduce(function(s,v){return s+(v.ganancia||0);},0);
+  var ganPre=prestamos.reduce(function(s,p){return s+(p.ganancia||0);},0);
+  var totalClientes=clientes.length;
+  var ventasActivas=ventas.filter(function(v){return v.estado==='activo';}).length;
+  var prestamosActivos=prestamos.filter(function(p){return p.estado==='activo';}).length;
+
+  // Próximos pagos esperados (deudores con día de pago)
+  var proximosPagos=deudores.filter(function(d){return d.saldo_actual>0&&d.dia_pago;}).slice(0,3);
+
+  var meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var mesActual=meses[n.getMonth()]+' '+n.getFullYear();
+  var recientes=movimientos.slice(0,5);
+
+  return '<!-- HEADER BIENVENIDA -->'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'+
+    '<div>'+
+    '<div style="font-size:18px;font-weight:600">Buenos días 👋</div>'+
+    '<div style="font-size:12px;color:var(--muted)">'+mesActual+' · '+totalClientes+' clientes registrados</div>'+
+    '</div>'+
+    '<button class="btn-outline" style="font-size:12px;padding:8px 14px;flex-shrink:0" onclick="abrirNuevoCliente()">+ Nuevo cliente</button>'+
+    '</div>'+
+
+    '<!-- RESUMEN PRINCIPAL -->'+
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px">'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Total por cobrar</div>'+
+    '<div style="font-size:32px;font-weight:600;font-family:DM Mono,monospace;color:var(--amber)">'+fmt(totalDeuda)+'</div>'+
+    '<div style="display:flex;gap:16px;margin-top:10px">'+
+    '<div style="font-size:12px;color:var(--muted)"><span style="color:var(--amber);font-weight:500">'+deudoresActivos+'</span> activos</div>'+
+    '<div style="font-size:12px;color:var(--muted)"><span style="color:var(--green);font-weight:500">'+deudoresLiquidados+'</span> liquidados</div>'+
+    '<div style="font-size:12px;color:var(--muted)"><span style="color:var(--accent);font-weight:500">'+ventasActivas+'</span> créditos</div>'+
+    '<div style="font-size:12px;color:var(--muted)"><span style="color:var(--purple);font-weight:500">'+prestamosActivos+'</span> préstamos</div>'+
+    '</div></div>'+
+
+    '<!-- COBROS SEMANA/MES -->'+
     '<div class="stats-grid">'+
     '<div class="stat-card"><div class="stat-label">Cobrado esta semana</div><div class="stat-val sv-green">'+fmt(cobSem)+'</div></div>'+
     '<div class="stat-card"><div class="stat-label">Cobrado este mes</div><div class="stat-val sv-accent">'+fmt(cobMes)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Multas este mes</div><div class="stat-val sv-red">'+fmt(multasMes)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Gan. créditos/prest.</div><div class="stat-val sv-purple">'+fmt(ganVentas+ganPre)+'</div></div>'+
     '</div>'+
-    '<div class="stats-grid">'+
-    '<div class="stat-card"><div class="stat-label">Total por cobrar</div><div class="stat-val sv-amber">'+fmt(totalDeuda)+'</div></div>'+
-    '<div class="stat-card"><div class="stat-label">Multas cobradas</div><div class="stat-val sv-red">'+fmt(totalMultas)+'</div></div>'+
-    '</div>'+
-    '<div class="section-title">Deudores</div>'+
-    deudores.slice(0,4).map(function(d){
-      var pct=d.saldo_inicial>0?Math.round(((d.saldo_inicial-d.saldo_actual)/d.saldo_inicial)*100):0;
-      return '<div class="list-item" onclick="navTo(\'cobros\');verDeudor(\''+d.id+'\')">'+
-        '<div class="list-item-top">'+
-        '<div><div class="item-name">'+d.nombre+'</div>'+
-        '<div class="item-sub">'+(d.dia_pago||'Sin día fijo')+'</div></div>'+
-        '<div style="text-align:right"><div style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--amber)">'+fmt(d.saldo_actual)+'</div>'+
-        '<div style="font-size:10px;color:var(--muted)">'+pct+'% pagado</div></div></div>'+
-        '<div class="prog-bar"><div class="prog-fill" style="width:'+pct+'%"></div></div></div>';
+
+    '<!-- ACCESOS RAPIDOS -->'+
+    '<div class="section-title">Accesos rápidos</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">'+
+    [
+      {icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg>',label:'Cobros',action:"navTo('cobros')"},
+      {icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>',label:'Créditos',action:"navTo('ventas')"},
+      {icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',label:'Préstamos',action:"navTo('prestamos')"},
+      {icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 014-4h6a4 4 0 014 4v2"/><path d="M19 8v6m-3-3h6"/></svg>',label:'+ Cliente',action:'abrirNuevoCliente()'},
+    ].map(function(a){
+      return '<button onclick="'+a.action+'" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;color:var(--muted);font-size:11px;font-family:inherit;width:100%">'+a.icon+a.label+'</button>';
     }).join('')+
+    '</div>'+
+
+    '<!-- PROXIMOS PAGOS -->'+
+    (proximosPagos.length?
+    '<div class="section-title">Próximos pagos esperados</div>'+
+    proximosPagos.map(function(d){
+      return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="navTo('cobros');verDeudor(''+d.id+'')">'+
+        '<div>'+
+        '<div style="font-size:14px;font-weight:500">'+d.nombre+'</div>'+
+        '<div style="font-size:11px;color:var(--muted)">Paga '+d.dia_pago+(d.pago_esperado?' · '+fmt(d.pago_esperado):'')+'</div>'+
+        '</div>'+
+        '<div style="text-align:right">'+
+        '<div style="font-size:14px;font-weight:600;font-family:DM Mono,monospace;color:var(--amber)">'+fmt(d.saldo_actual)+'</div>'+
+        '<span class="badge badge-amber">Pendiente</span>'+
+        '</div></div>';
+    }).join('')
+    :'')+
+
+    '<!-- ULTIMOS MOVIMIENTOS -->'+
     '<div class="section-title">Últimos movimientos</div>'+
     (recientes.length?recientes.map(function(m){
       var d=deudores.find(function(x){return x.id===m.deudor_id;});
       var color=m.tipo==='abono'?'var(--green)':m.tipo==='multa'?'var(--red)':'var(--amber)';
+      var badge=m.tipo==='abono'?'badge-green':m.tipo==='multa'?'badge-red':'badge-amber';
       var label=m.tipo==='abono'?'Abono':m.tipo==='multa'?'Multa':'Cargo';
-      return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">'+
+      return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="navTo('cobros');verDeudor(''+(d?d.id:'')+'')" >'+
         '<div><div style="font-size:13px;font-weight:500">'+(d?d.nombre:'—')+'</div>'+
         '<div style="font-size:11px;color:var(--muted)">'+fmtD(m.fecha)+(m.nota?' · '+m.nota:'')+'</div></div>'+
-        '<div style="text-align:right"><div style="font-size:14px;font-family:DM Mono,monospace;font-weight:600;color:'+color+'">'+fmt(m.monto)+'</div>'+
-        '<span class="badge '+(m.tipo==='abono'?'badge-green':m.tipo==='multa'?'badge-red':'badge-amber')+'">'+label+'</span></div></div>';
-    }).join(''):'<div style="font-size:13px;color:var(--muted)">Sin movimientos</div>');
+        '<div style="text-align:right">'+
+        '<div style="font-size:14px;font-family:DM Mono,monospace;font-weight:600;color:'+color+'">'+fmt(m.monto)+'</div>'+
+        '<span class="badge '+badge+'">'+label+'</span></div></div>';
+    }).join(''):'<div style="font-size:13px;color:var(--muted)">Sin movimientos aún</div>');
+}
+
+function abrirNuevoCliente(){
+  // Open deudor modal for new person (appears in all sections)
+  openDeudorModal(null);
 }
 
 // COBROS LIST
