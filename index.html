@@ -273,7 +273,40 @@ input,select,button,textarea{font-family:inherit;}
       </select>
     </div>
     <div id="pre-semanas-wrap" class="form-group"><label class="form-label">Número de semanas</label><input class="form-input" id="pre-semanas" type="number" value="4"></div>
+    <div class="form-group"><label class="form-label">Día de pago esperado</label>
+      <select class="form-select" id="pre-dia">
+        <option value="">Sin día fijo</option>
+        <option value="Lunes">Lunes</option><option value="Martes">Martes</option>
+        <option value="Miércoles">Miércoles</option><option value="Jueves">Jueves</option>
+        <option value="Viernes">Viernes</option><option value="Sábado">Sábado</option>
+        <option value="Domingo">Domingo</option>
+        <option value="Día 1">Día 1</option><option value="Día 5">Día 5</option>
+        <option value="Día 10">Día 10</option><option value="Día 15">Día 15</option>
+        <option value="Día 20">Día 20</option><option value="Día 23">Día 23</option>
+        <option value="Día 25">Día 25</option><option value="Día 30">Día 30</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Multa por no pagar a tiempo ($)</label><input class="form-input" id="pre-multa" type="number" placeholder="Ej: 150" value="0"></div>
+    <div class="form-group"><label class="form-label">Notas (opcional)</label><input class="form-input" id="pre-notas" placeholder="Ej: acordado el 01/04/2026..."></div>
     <button class="btn-primary" onclick="guardarPrestamo()">Guardar préstamo</button>
+    <div id="pre-movs-wrap" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">Registrar movimiento</div>
+      </div>
+      <div class="form-group">
+        <div class="tipo-row">
+          <button class="tipo-btn sel-abono" id="pre-tipo-abono" onclick="setPreTipo('abono')">Abono</button>
+          <button class="tipo-btn" id="pre-tipo-multa" onclick="setPreTipo('multa')">Multa</button>
+          <button class="tipo-btn" id="pre-tipo-cargo" onclick="setPreTipo('cargo')">Cargo extra</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Monto ($)</label><input class="form-input" id="pre-mov-monto" type="number" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="pre-mov-fecha" type="date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Nota (opcional)</label><input class="form-input" id="pre-mov-nota" placeholder="Ej: pago tardío"></div>
+      <button class="btn-outline" style="width:100%" onclick="guardarMovPrestamo()">+ Registrar movimiento</button>
+    </div>
   </div>
 </div>
 
@@ -649,8 +682,12 @@ function verPrestamo(id){
     '<div class="info-row"><span class="info-key">Cobro semanal</span><span class="info-val sv-accent">'+fmt(p.cobro_semanal)+'</span></div>'+
     '<div class="info-row"><span class="info-key">Total a cobrar</span><span class="info-val">'+fmt(p.total_cobrar)+'</span></div>'+
     '<div class="info-row"><span class="info-key">Ganancia</span><span class="info-val sv-green">'+fmt(p.ganancia)+'</span></div>'+
-    '<div class="info-row" style="border:none"><span class="info-key">Progreso</span><span class="info-val">'+(p.semanas_pagadas||0)+'/'+p.semanas+'</span></div>'+
-    '<div class="prog-bar"><div class="prog-fill" style="width:'+Math.round(((p.semanas_pagadas||0)/p.semanas)*100)+'%"></div></div></div>'+
+    (p.dia_pago?'<div class="info-row"><span class="info-key">Día de pago</span><span class="info-val">'+p.dia_pago+'</span></div>':'')+
+    (p.multa_por_atraso?'<div class="info-row"><span class="info-key">Multa por atraso</span><span class="info-val sv-red">'+fmt(p.multa_por_atraso)+'</span></div>':'')+
+    (p.notas?'<div class="info-row"><span class="info-key">Notas</span><span style="font-size:12px;color:var(--muted)">'+p.notas+'</span></div>':'')+
+    '<div class="info-row" style="border:none"><span class="info-key">Progreso</span><span class="info-val">'+(p.semanas===9999?'Indefinido':(p.semanas_pagadas||0)+'/'+p.semanas+' semanas')+'</span></div>'+
+    (p.semanas!==9999?'<div class="prog-bar"><div class="prog-fill" style="width:'+Math.round(((p.semanas_pagadas||0)/p.semanas)*100)+'%"></div></div>':'')+
+    '</div>'+
     '<div class="section-title">Pagos semanales</div><div class="card" style="padding:0 16px">'+filas+'</div>'+
     (p.estado==='activo'?'<button class="btn-danger" onclick="confirmar(\'¿Liquidar préstamo?\',\'\',function(){liquidarPrestamo(\''+p.id+'\')})">Liquidar</button>':'');
 }
@@ -874,6 +911,13 @@ function poblarClientes(selectId, selectedId){
   }).join('');
 }
 
+var preMovTipo='abono';
+function setPreTipo(t){
+  preMovTipo=t;
+  ['abono','multa','cargo'].forEach(function(x){document.getElementById('pre-tipo-'+x).className='tipo-btn';});
+  document.getElementById('pre-tipo-'+t).className='tipo-btn sel-'+t;
+}
+
 function abrirModalPrestamo(){
   document.getElementById('pre-id').value='';
   document.getElementById('mp-title').innerHTML='Nuevo préstamo <button class="modal-close" onclick="closeModal(\'modal-prestamo\')">×</button>';
@@ -883,6 +927,11 @@ function abrirModalPrestamo(){
   document.getElementById('pre-semanas').value=4;
   document.getElementById('pre-semanas-tipo').value='fijo';
   document.getElementById('pre-semanas-wrap').style.display='block';
+  document.getElementById('pre-dia').value='';
+  document.getElementById('pre-multa').value=0;
+  document.getElementById('pre-notas').value='';
+  document.getElementById('pre-movs-wrap').style.display='none';
+  document.getElementById('pre-mov-fecha').value=hoy();
   openModal('modal-prestamo');
 }
 
@@ -897,6 +946,12 @@ function abrirModalPrestamoEdit(id){
   document.getElementById('pre-semanas-tipo').value=esIndef?'indefinido':'fijo';
   document.getElementById('pre-semanas').value=esIndef?4:p.semanas;
   document.getElementById('pre-semanas-wrap').style.display=esIndef?'none':'block';
+  document.getElementById('pre-dia').value=p.dia_pago||'';
+  document.getElementById('pre-multa').value=p.multa_por_atraso||0;
+  document.getElementById('pre-notas').value=p.notas||'';
+  document.getElementById('pre-movs-wrap').style.display='block';
+  document.getElementById('pre-mov-fecha').value=hoy();
+  setPreTipo('abono');
   openModal('modal-prestamo');
 }
 
@@ -908,13 +963,37 @@ async function guardarPrestamo(){
   var com=parseFloat(document.getElementById('pre-comision').value)||50;
   var esIndef=document.getElementById('pre-semanas-tipo').value==='indefinido';
   var sem=esIndef?9999:parseInt(document.getElementById('pre-semanas').value)||4;
+  var dia_pago=document.getElementById('pre-dia').value;
+  var multa=parseFloat(document.getElementById('pre-multa').value)||0;
+  var notas=document.getElementById('pre-notas').value.trim();
   if(!monto){toast('Ingresa el monto');return;}
   var cobro=Math.round((monto/1000)*com);
   var gan=esIndef?cobro:cobro*sem;
-  var data={cliente_id,monto,comision_por_mil:com,semanas:sem,cobro_semanal:cobro,total_cobrar:esIndef?monto:monto+gan,ganancia:gan};
-  if(id) await sb.from('prestamos').update(data).eq('id',id);
-  else await sb.from('prestamos').insert(Object.assign({},data,{semanas_pagadas:0,estado:'activo'}));
-  toast('Préstamo guardado');closeModal('modal-prestamo');await loadAll();
+  var data={cliente_id,monto,comision_por_mil:com,semanas:sem,cobro_semanal:cobro,total_cobrar:esIndef?monto:monto+gan,ganancia:gan,dia_pago,multa_por_atraso:multa,notas};
+  if(id){
+    await sb.from('prestamos').update(data).eq('id',id);
+    toast('Préstamo actualizado');
+  } else {
+    await sb.from('prestamos').insert(Object.assign({},data,{semanas_pagadas:0,estado:'activo'}));
+    toast('Préstamo guardado');
+  }
+  closeModal('modal-prestamo');await loadAll();
+}
+
+async function guardarMovPrestamo(){
+  var preId=document.getElementById('pre-id').value;
+  if(!preId){toast('Guarda el préstamo primero');return;}
+  var monto=parseFloat(document.getElementById('pre-mov-monto').value)||0;
+  var fecha=document.getElementById('pre-mov-fecha').value;
+  var nota=document.getElementById('pre-mov-nota').value.trim();
+  if(!monto||!fecha){toast('Ingresa monto y fecha');return;}
+  var p=prestamos.find(function(x){return x.id===preId;});
+  var nuevoSaldo=preMovTipo==='abono'?(p.total_cobrar-(p.semanas_pagadas||0)*p.cobro_semanal)-monto:(p.total_cobrar-(p.semanas_pagadas||0)*p.cobro_semanal)+monto;
+  await sb.from('pagos').insert({tipo:'prestamo_mov',ref_id:preId,periodo:0,monto,fecha,nota:nota+(preMovTipo!=='abono'?' ['+preMovTipo+']':'')});
+  toast('Movimiento registrado');
+  document.getElementById('pre-mov-monto').value='';
+  document.getElementById('pre-mov-nota').value='';
+  await loadAll();
 }
 
 async function pagarPrestamo(id,semana){
