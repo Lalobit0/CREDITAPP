@@ -263,10 +263,16 @@ input,select,button,textarea{font-family:inherit;}
   <div class="modal">
     <div class="modal-title" id="mp-title">Nuevo préstamo <button class="modal-close" onclick="closeModal('modal-prestamo')">×</button></div>
     <input type="hidden" id="pre-id">
-    <div class="form-group"><label class="form-label">Cliente</label><select class="form-select" id="pre-cliente"></select></div>
+    <div class="form-group"><label class="form-label">Cliente</label><select class="form-select" id="pre-cliente"><option value="">Selecciona un cliente...</option></select></div>
     <div class="form-group"><label class="form-label">Monto ($)</label><input class="form-input" id="pre-monto" type="number" placeholder="5000"></div>
     <div class="form-group"><label class="form-label">Comisión por $1,000/semana ($)</label><input class="form-input" id="pre-comision" type="number" value="50"></div>
-    <div class="form-group"><label class="form-label">Semanas</label><input class="form-input" id="pre-semanas" type="number" value="4"></div>
+    <div class="form-group"><label class="form-label">Plazo</label>
+      <select class="form-select" id="pre-semanas-tipo" onchange="toggleSemanas(this.value)">
+        <option value="fijo">Número fijo de semanas</option>
+        <option value="indefinido">Indefinido</option>
+      </select>
+    </div>
+    <div id="pre-semanas-wrap" class="form-group"><label class="form-label">Número de semanas</label><input class="form-input" id="pre-semanas" type="number" value="4"></div>
     <button class="btn-primary" onclick="guardarPrestamo()">Guardar préstamo</button>
   </div>
 </div>
@@ -775,11 +781,26 @@ async function liquidarVenta(id){
 }
 
 // PRESTAMOS
+function toggleSemanas(val){
+  document.getElementById('pre-semanas-wrap').style.display=val==='indefinido'?'none':'block';
+}
+
+function poblarClientes(selectId, selectedId){
+  var sel=document.getElementById(selectId);
+  sel.innerHTML='<option value="">Selecciona un cliente...</option>'+clientes.map(function(c){
+    return '<option value="'+c.id+'"'+(c.id===selectedId?' selected':'')+'>'+c.nombre+'</option>';
+  }).join('');
+}
+
 function abrirModalPrestamo(){
   document.getElementById('pre-id').value='';
   document.getElementById('mp-title').innerHTML='Nuevo préstamo <button class="modal-close" onclick="closeModal(\'modal-prestamo\')">×</button>';
-  document.getElementById('pre-cliente').innerHTML=clientes.map(function(c){return'<option value="'+c.id+'">'+c.nombre+'</option>';}).join('');
-  document.getElementById('pre-monto').value='';document.getElementById('pre-comision').value=50;document.getElementById('pre-semanas').value=4;
+  poblarClientes('pre-cliente','');
+  document.getElementById('pre-monto').value='';
+  document.getElementById('pre-comision').value=50;
+  document.getElementById('pre-semanas').value=4;
+  document.getElementById('pre-semanas-tipo').value='fijo';
+  document.getElementById('pre-semanas-wrap').style.display='block';
   openModal('modal-prestamo');
 }
 
@@ -787,22 +808,28 @@ function abrirModalPrestamoEdit(id){
   var p=prestamos.find(function(x){return x.id===id;});
   document.getElementById('pre-id').value=id;
   document.getElementById('mp-title').innerHTML='Editar préstamo <button class="modal-close" onclick="closeModal(\'modal-prestamo\')">×</button>';
-  document.getElementById('pre-cliente').innerHTML=clientes.map(function(c){return'<option value="'+c.id+'"'+(c.id===p.cliente_id?' selected':'')+'>'+c.nombre+'</option>';}).join('');
+  poblarClientes('pre-cliente', p.cliente_id);
   document.getElementById('pre-monto').value=p.monto;
   document.getElementById('pre-comision').value=p.comision_por_mil;
-  document.getElementById('pre-semanas').value=p.semanas;
+  var esIndef=p.semanas===9999;
+  document.getElementById('pre-semanas-tipo').value=esIndef?'indefinido':'fijo';
+  document.getElementById('pre-semanas').value=esIndef?4:p.semanas;
+  document.getElementById('pre-semanas-wrap').style.display=esIndef?'none':'block';
   openModal('modal-prestamo');
 }
 
 async function guardarPrestamo(){
   var id=document.getElementById('pre-id').value;
   var cliente_id=document.getElementById('pre-cliente').value;
+  if(!cliente_id){toast('Selecciona un cliente');return;}
   var monto=parseFloat(document.getElementById('pre-monto').value)||0;
   var com=parseFloat(document.getElementById('pre-comision').value)||50;
-  var sem=parseInt(document.getElementById('pre-semanas').value)||4;
+  var esIndef=document.getElementById('pre-semanas-tipo').value==='indefinido';
+  var sem=esIndef?9999:parseInt(document.getElementById('pre-semanas').value)||4;
   if(!monto){toast('Ingresa el monto');return;}
-  var cobro=Math.round((monto/1000)*com);var gan=cobro*sem;
-  var data={cliente_id,monto,comision_por_mil:com,semanas:sem,cobro_semanal:cobro,total_cobrar:monto+gan,ganancia:gan};
+  var cobro=Math.round((monto/1000)*com);
+  var gan=esIndef?cobro:cobro*sem;
+  var data={cliente_id,monto,comision_por_mil:com,semanas:sem,cobro_semanal:cobro,total_cobrar:esIndef?monto:monto+gan,ganancia:gan};
   if(id) await sb.from('prestamos').update(data).eq('id',id);
   else await sb.from('prestamos').insert(Object.assign({},data,{semanas_pagadas:0,estado:'activo'}));
   toast('Préstamo guardado');closeModal('modal-prestamo');await loadAll();
