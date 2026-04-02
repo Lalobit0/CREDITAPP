@@ -459,7 +459,7 @@ function renderDashboard(){
       var color=m.tipo==='abono'?'var(--green)':m.tipo==='multa'?'var(--red)':'var(--amber)';
       var badge=m.tipo==='abono'?'badge-green':m.tipo==='multa'?'badge-red':'badge-amber';
       var label=m.tipo==='abono'?'Abono':m.tipo==='multa'?'Multa':'Cargo';
-      return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="navTo('cobros');verDeudor(''+(d?d.id:'')+'')" >'+
+      return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="navTo(\'cobros\');verDeudor(\''+(d?d.id:'')+'\')">'+
         '<div><div style="font-size:13px;font-weight:500">'+(d?d.nombre:'—')+'</div>'+
         '<div style="font-size:11px;color:var(--muted)">'+fmtD(m.fecha)+(m.nota?' · '+m.nota:'')+'</div></div>'+
         '<div style="text-align:right">'+
