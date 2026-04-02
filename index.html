@@ -177,7 +177,7 @@ input,select,button,textarea{font-family:inherit;}
 <!-- MODAL DEUDOR -->
 <div class="modal-overlay" id="modal-deudor">
   <div class="modal">
-    <div class="modal-title" id="md-title">Nuevo deudor <button class="modal-close" onclick="closeModal('modal-deudor')">×</button></div>
+    <div class="modal-title" id="md-title">Nueva persona <button class="modal-close" onclick="closeModal('modal-deudor')">×</button></div>
     <input type="hidden" id="d-id">
     <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="d-nombre" placeholder="Ej: Joaquín"></div>
     <div class="form-group"><label class="form-label">Teléfono (opcional)</label><input class="form-input" id="d-tel" placeholder="664 123 4567"></div>
@@ -590,7 +590,7 @@ function verPrestamo(id){
 function openDeudorModal(id){
   var d=id?deudores.find(function(x){return x.id===id;}):null;
   document.getElementById('d-id').value=id||'';
-  document.getElementById('md-title').innerHTML=(d?'Editar deudor':'Nuevo deudor')+' <button class="modal-close" onclick="closeModal(\'modal-deudor\')">×</button>';
+  document.getElementById('md-title').innerHTML=(d?'Editar cliente':'Nueva persona')+' <button class="modal-close" onclick="closeModal(\'modal-deudor\')">×</button>';
   document.getElementById('d-nombre').value=d?d.nombre:'';
   document.getElementById('d-tel').value=d?d.telefono||'':'';
   document.getElementById('d-saldo').value=d?d.saldo_actual:'';
@@ -611,11 +611,16 @@ async function guardarDeudor(){
   var notas=document.getElementById('d-notas').value.trim();
   if(!nombre){toast('Ingresa el nombre');return;}
   if(id){
+    // Update both deudor and cliente
     await sb.from('deudores').update({nombre,telefono,saldo_actual:saldo,dia_pago,pago_esperado,notas}).eq('id',id);
-    toast('Deudor actualizado');
+    await sb.from('clientes').update({nombre,telefono,notas}).eq('id',id);
+    toast('Cliente actualizado');
   } else {
-    await sb.from('deudores').insert({nombre,telefono,saldo_inicial:saldo,saldo_actual:saldo,dia_pago,pago_esperado,notas});
-    toast('Deudor guardado');
+    // Insert into clientes first, then deudores with same id
+    var newId = crypto.randomUUID();
+    await sb.from('clientes').insert({id:newId,nombre,telefono,notas});
+    await sb.from('deudores').insert({id:newId,nombre,telefono,saldo_inicial:saldo,saldo_actual:saldo,dia_pago,pago_esperado,notas,cliente_id:newId});
+    toast('Cliente guardado');
   }
   closeModal('modal-deudor');
   await loadAll();
@@ -626,10 +631,11 @@ async function eliminarDeudor(){
   var id=document.getElementById('d-id').value;
   var d=deudores.find(function(x){return x.id===id;});
   closeModal('modal-deudor');
-  confirmar('Eliminar a '+d.nombre,'Esto eliminará al deudor y TODOS sus movimientos. No se puede deshacer.',async function(){
+  confirmar('Eliminar a '+d.nombre,'Esto eliminará al cliente y TODOS sus registros. No se puede deshacer.',async function(){
     await sb.from('movimientos').delete().eq('deudor_id',id);
     await sb.from('deudores').delete().eq('id',id);
-    toast('Deudor eliminado');
+    await sb.from('clientes').delete().eq('id',id);
+    toast('Cliente eliminado');
     deudorId=null;await loadAll();
   });
 }
@@ -704,8 +710,15 @@ async function guardarCliente(){
   var telefono=document.getElementById('cli-tel').value.trim();
   var notas=document.getElementById('cli-notas').value.trim();
   if(!nombre){toast('Ingresa el nombre');return;}
-  if(id) await sb.from('clientes').update({nombre,telefono,notas}).eq('id',id);
-  else await sb.from('clientes').insert({nombre,telefono,notas});
+  if(id){
+    await sb.from('clientes').update({nombre,telefono,notas}).eq('id',id);
+    // Also update deudor if exists
+    var d=deudores.find(function(x){return x.id===id;});
+    if(d) await sb.from('deudores').update({nombre,telefono,notas}).eq('id',id);
+  } else {
+    var newId=crypto.randomUUID();
+    await sb.from('clientes').insert({id:newId,nombre,telefono,notas});
+  }
   toast('Cliente guardado');closeModal('modal-cliente');await loadAll();
 }
 
