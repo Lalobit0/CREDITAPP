@@ -175,6 +175,10 @@ input,select,button,textarea{font-family:inherit;}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       Historial
     </button>
+    <button class="nav-item" id="nav-calc" onclick="navTo('calc')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/></svg>
+      Calcular
+    </button>
   </nav>
 </div>
 
@@ -372,9 +376,9 @@ function navTo(v){
   view=v;deudorId=null;
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   var el=document.getElementById('nav-'+v);if(el)el.classList.add('active');
-  var subs={dashboard:'Inicio',cobros:'Cobros',ventas:'Créditos Apple',prestamos:'Préstamos',historial:'Historial de pagos'};
+  var subs={dashboard:'Inicio',cobros:'Cobros',ventas:'Créditos Apple',prestamos:'Préstamos',historial:'Historial de pagos',calc:'Calculadora'};
   document.getElementById('topbar-sub').textContent=subs[v]||'';
-  document.getElementById('fab').style.display=(v==='historial')?'none':'flex';
+  document.getElementById('fab').style.display=(v==='historial'||v==='calc')?'none':'flex';
   renderView();
 }
 
@@ -392,6 +396,7 @@ function renderView(){
   else if(view==='ventas')el.innerHTML=renderVentas();
   else if(view==='prestamos')el.innerHTML=renderPrestamos();
   else if(view==='historial')el.innerHTML=renderHistorial();
+  else if(view==='calc')el.innerHTML=renderCalc();
 }
 
 // DASHBOARD
@@ -1010,6 +1015,187 @@ async function pagarPrestamo(id,semana){
 async function liquidarPrestamo(id){
   await sb.from('prestamos').update({estado:'liquidado'}).eq('id',id);
   toast('Liquidado');await loadAll();navTo('prestamos');
+}
+
+// CALCULADORA
+var calcTab='prestamo';
+var calcPrestamos=[];
+var calcIdCounter=0;
+
+function renderCalc(){
+  var tabStyle=function(t){
+    return 'border:1px solid '+(calcTab===t?'var(--accent)':'var(--border2)')+
+    ';background:'+(calcTab===t?'var(--accent-dim)':'none')+
+    ';color:'+(calcTab===t?'var(--accent)':'var(--muted)')+
+    ';border-radius:99px;padding:7px 20px;font-size:13px;cursor:pointer;font-family:inherit';
+  };
+
+  var html='<div style="display:flex;gap:8px;margin-bottom:20px">'+
+    '<button style="'+tabStyle('prestamo')+'" onclick="calcTab=\'prestamo\';renderView()">Préstamo en efectivo</button>'+
+    '<button style="'+tabStyle('credito')+'" onclick="calcTab=\'credito\';renderView()">Crédito Apple</button>'+
+    '</div>';
+
+  if(calcTab==='prestamo'){
+    html+=renderCalcPrestamo();
+  } else {
+    html+=renderCalcCredito();
+  }
+  return html;
+}
+
+function renderCalcPrestamo(){
+  var lista=calcPrestamos.length?
+    '<div style="margin-top:16px">'+
+    '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;display:flex;justify-content:space-between">'+
+    '<span>Préstamos agregados</span>'+
+    '<span style="color:var(--accent)">'+calcPrestamos.length+' total</span></div>'+
+    calcPrestamos.map(function(p){
+      return '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px">'+
+        '<div><div style="font-size:13px;font-weight:500">'+fmt(p.monto)+'</div>'+
+        '<div style="font-size:11px;color:var(--muted)">$'+p.com+'/mil · '+p.sem+' sem</div></div>'+
+        '<div style="text-align:right">'+
+        '<div style="font-size:13px;font-weight:600;color:var(--green)">'+fmt(p.cobSem)+'/sem</div>'+
+        '<button onclick="calcPrestamos=calcPrestamos.filter(function(x){return x.id!=='+p.id+'});renderView()" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;padding:0">eliminar</button>'+
+        '</div></div>';
+    }).join('')+
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-top:8px">'+
+    '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">'+
+    (function(){
+      var totMonto=calcPrestamos.reduce(function(s,p){return s+p.monto;},0);
+      var totSem=calcPrestamos.reduce(function(s,p){return s+p.cobSem;},0);
+      var totGan=calcPrestamos.reduce(function(s,p){return s+p.ganancia;},0);
+      return '<div style="text-align:center"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">Total prestado</div>'+
+        '<div style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--accent)">'+fmt(totMonto)+'</div></div>'+
+        '<div style="text-align:center"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">Cobro semanal</div>'+
+        '<div style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--amber)">'+fmt(totSem)+'</div></div>'+
+        '<div style="text-align:center"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">Ganancia total</div>'+
+        '<div style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--green)">'+fmt(totGan)+'</div></div>';
+    })()+
+    '</div></div></div>'
+  :'';
+
+  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px">'+
+    '<div style="font-size:13px;font-weight:500;margin-bottom:14px">Nuevo préstamo</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+    '<div><div style="font-size:11px;color:var(--muted);margin-bottom:5px">Monto ($)</div>'+
+    '<input class="form-input" id="cp-monto" type="number" placeholder="5000" style="font-size:13px"></div>'+
+    '<div><div style="font-size:11px;color:var(--muted);margin-bottom:5px">Semanas</div>'+
+    '<input class="form-input" id="cp-sem" type="number" value="4" style="font-size:13px"></div>'+
+    '</div>'+
+    '<div style="margin-bottom:12px"><div style="font-size:11px;color:var(--muted);margin-bottom:5px">Comisión por $1,000/semana ($)</div>'+
+    '<input class="form-input" id="cp-com" type="number" value="50" style="font-size:13px"></div>'+
+    '<div id="cp-preview" style="display:none;background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">'+
+    '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center">'+
+    '<div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Cobro/sem</div><div id="cp-csem" style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--amber)">—</div></div>'+
+    '<div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Total cobrar</div><div id="cp-total" style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--accent)">—</div></div>'+
+    '<div><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Ganancia</div><div id="cp-gan" style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--green)">—</div></div>'+
+    '</div></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn-outline" style="flex:1;font-size:12px" onclick="calcPreviewPrestamo()">Calcular</button>'+
+    '<button class="btn-primary" style="flex:1;margin:0;font-size:12px" onclick="calcAgregarPrestamo()">+ Agregar</button>'+
+    '</div></div>'+lista;
+}
+
+function calcPreviewPrestamo(){
+  var monto=parseFloat(document.getElementById('cp-monto').value)||0;
+  var sem=parseInt(document.getElementById('cp-sem').value)||4;
+  var com=parseFloat(document.getElementById('cp-com').value)||50;
+  if(!monto)return;
+  var cobSem=Math.round((monto/1000)*com);
+  var gan=cobSem*sem;
+  document.getElementById('cp-csem').textContent=fmt(cobSem);
+  document.getElementById('cp-total').textContent=fmt(monto+gan);
+  document.getElementById('cp-gan').textContent=fmt(gan);
+  document.getElementById('cp-preview').style.display='block';
+}
+
+function calcAgregarPrestamo(){
+  var monto=parseFloat(document.getElementById('cp-monto').value)||0;
+  var sem=parseInt(document.getElementById('cp-sem').value)||4;
+  var com=parseFloat(document.getElementById('cp-com').value)||50;
+  if(!monto){toast('Ingresa un monto');return;}
+  var cobSem=Math.round((monto/1000)*com);
+  var ganancia=cobSem*sem;
+  calcPrestamos.push({id:calcIdCounter++,monto,sem,com,cobSem,ganancia});
+  renderView();
+}
+
+var calcProds=[
+  {n:'iPhone 16 Pro Max',p:14999},{n:'iPhone 16 Pro',p:13499},
+  {n:'iPhone 15 Pro Max',p:12500},{n:'iPhone 15 Pro',p:10499},
+  {n:'iPhone 14 Pro Max',p:9999},{n:'iPhone 14 Pro',p:8499},
+  {n:'iPhone 13 Pro Max',p:8199},
+];
+var calcSelProd=0;
+var calcSelPlazo=0;
+var calcPlazos=[
+  {l:'4 semanas',n:4,t:'sem'},{l:'8 semanas',n:8,t:'sem'},
+  {l:'12 semanas',n:12,t:'sem'},{l:'3 meses',n:3,t:'mes'},
+  {l:'6 meses',n:6,t:'mes'},
+];
+
+function renderCalcCredito(){
+  var prod=calcProds[calcSelProd];
+  var plazo=calcPlazos[calcSelPlazo];
+
+  var prodsHtml='<div style="overflow-x:auto;white-space:nowrap;margin-bottom:12px;padding-bottom:2px">'+
+    calcProds.map(function(p,i){
+      var sel=i===calcSelProd;
+      return '<button onclick="calcSelProd='+i+';renderView()" style="display:inline-block;margin-right:6px;border:1px solid '+(sel?'var(--accent)':'var(--border2)')+';background:'+(sel?'var(--accent-dim)':'none')+';color:'+(sel?'var(--accent)':'var(--muted)')+';border-radius:var(--radius-sm);padding:6px 10px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">'+p.n+'</button>';
+    }).join('')+'</div>';
+
+  var plazosHtml='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">'+
+    calcPlazos.map(function(p,i){
+      var sel=i===calcSelPlazo;
+      return '<button onclick="calcSelPlazo='+i+';renderView()" style="border:1px solid '+(sel?'var(--accent)':'var(--border2)')+';background:'+(sel?'var(--accent-dim)':'none')+';color:'+(sel?'var(--accent)':'var(--muted)')+';border-radius:99px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:inherit">'+p.l+'</button>';
+    }).join('')+'</div>';
+
+  return prodsHtml+
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px">'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:5px">Enganche ($)</div>'+
+    '<input class="form-input" id="cc-eng" type="number" value="0" oninput="renderCalcCreditoPreview()" style="margin-bottom:12px;font-size:13px">'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:5px">Tasa de interés (%)</div>'+
+    '<input class="form-input" id="cc-tasa" type="number" value="25" oninput="renderCalcCreditoPreview()" style="margin-bottom:14px;font-size:13px">'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Plazo</div>'+
+    plazosHtml+
+    '<div id="cc-preview" style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
+    '<div><div style="font-size:13px;font-weight:500">'+prod.n+'</div>'+
+    '<div style="font-size:11px;color:var(--muted)">Contado: '+fmt(prod.p)+'</div></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px" id="cc-stats">'+
+    calcCreditoStats(prod.p, 0, 25, plazo)+
+    '</div></div></div>';
+}
+
+function calcCreditoStats(precio, eng, tasa, plazo){
+  var saldo=precio-eng;
+  var interes=Math.round(saldo*tasa/100);
+  var totalFin=saldo+interes;
+  var totalCliente=eng+totalFin;
+  var gan=totalCliente-precio;
+  var pago=totalFin/plazo.n;
+  return '<div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">'+
+    '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">Precio crédito</div>'+
+    '<div style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--amber)">'+fmt(totalCliente)+'</div></div>'+
+    '<div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">'+
+    '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">Tu ganancia</div>'+
+    '<div style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--green)">'+fmt(gan)+'</div></div>'+
+    '<div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">'+
+    '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">Enganche</div>'+
+    '<div style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--accent)">'+fmt(eng)+'</div></div>'+
+    '<div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">'+
+    '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">Pago/'+plazo.t+'</div>'+
+    '<div style="font-size:15px;font-weight:600;font-family:DM Mono,monospace;color:var(--purple)">'+fmt(pago)+'</div></div>';
+}
+
+function renderCalcCreditoPreview(){
+  var eng=parseFloat(document.getElementById('cc-eng').value)||0;
+  var tasa=parseFloat(document.getElementById('cc-tasa').value)||0;
+  var prod=calcProds[calcSelProd];
+  var plazo=calcPlazos[calcSelPlazo];
+  var el=document.getElementById('cc-stats');
+  if(el) el.innerHTML=calcCreditoStats(prod.p, eng, tasa, plazo);
 }
 
 // HISTORIAL
