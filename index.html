@@ -171,6 +171,10 @@ input,select,button,textarea{font-family:inherit;}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
       Préstamos
     </button>
+    <button class="nav-item" id="nav-historial" onclick="navTo('historial')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Historial
+    </button>
   </nav>
 </div>
 
@@ -368,9 +372,9 @@ function navTo(v){
   view=v;deudorId=null;
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   var el=document.getElementById('nav-'+v);if(el)el.classList.add('active');
-  var subs={dashboard:'Inicio',cobros:'Cobros',ventas:'Créditos Apple',prestamos:'Préstamos'};
+  var subs={dashboard:'Inicio',cobros:'Cobros',ventas:'Créditos Apple',prestamos:'Préstamos',historial:'Historial de pagos'};
   document.getElementById('topbar-sub').textContent=subs[v]||'';
-  document.getElementById('fab').style.display='flex';
+  document.getElementById('fab').style.display=(v==='historial')?'none':'flex';
   renderView();
 }
 
@@ -387,6 +391,7 @@ function renderView(){
   else if(view==='cobros'){if(deudorId)renderDeudorDetail();else el.innerHTML=renderCobros();}
   else if(view==='ventas')el.innerHTML=renderVentas();
   else if(view==='prestamos')el.innerHTML=renderPrestamos();
+  else if(view==='historial')el.innerHTML=renderHistorial();
 }
 
 // DASHBOARD
@@ -1005,6 +1010,120 @@ async function pagarPrestamo(id,semana){
 async function liquidarPrestamo(id){
   await sb.from('prestamos').update({estado:'liquidado'}).eq('id',id);
   toast('Liquidado');await loadAll();navTo('prestamos');
+}
+
+// HISTORIAL
+var histFiltro='mes', histCliente='', histFechaDesde='', histFechaHasta='';
+
+function renderHistorial(){
+  var n=new Date();
+  var desde, hasta;
+
+  if(histFiltro==='semana'){
+    desde=new Date(n);desde.setDate(n.getDate()-n.getDay());desde.setHours(0,0,0,0);
+    hasta=new Date(desde);hasta.setDate(desde.getDate()+6);hasta.setHours(23,59,59,999);
+  } else if(histFiltro==='mes'){
+    desde=new Date(n.getFullYear(),n.getMonth(),1);
+    hasta=new Date(n.getFullYear(),n.getMonth()+1,0,23,59,59);
+  } else if(histFiltro==='3meses'){
+    desde=new Date(n.getFullYear(),n.getMonth()-2,1);
+    hasta=new Date(n.getFullYear(),n.getMonth()+1,0,23,59,59);
+  } else if(histFiltro==='año'){
+    desde=new Date(n.getFullYear(),0,1);
+    hasta=new Date(n.getFullYear(),11,31,23,59,59);
+  } else if(histFiltro==='personalizado'){
+    desde=histFechaDesde?new Date(histFechaDesde+'T00:00:00'):null;
+    hasta=histFechaHasta?new Date(histFechaHasta+'T23:59:59'):null;
+  } else {
+    desde=null;hasta=null;
+  }
+
+  var filtrados=movimientos.filter(function(m){
+    var d=new Date(m.fecha+'T12:00:00');
+    var matchFecha=(!desde||d>=desde)&&(!hasta||d<=hasta);
+    var deudor=deudores.find(function(x){return x.id===m.deudor_id;});
+    var nombre=(deudor?deudor.nombre:'').toLowerCase();
+    var matchCliente=!histCliente||nombre.includes(histCliente.toLowerCase());
+    return matchFecha&&matchCliente;
+  }).sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
+
+  var totalAbonos=filtrados.filter(function(m){return m.tipo==='abono';}).reduce(function(s,m){return s+m.monto;},0);
+  var totalMultas=filtrados.filter(function(m){return m.tipo==='multa';}).reduce(function(s,m){return s+m.monto;},0);
+  var totalCargos=filtrados.filter(function(m){return m.tipo==='cargo';}).reduce(function(s,m){return s+m.monto;},0);
+
+  var tabLabels=[
+    {k:'semana',l:'Esta semana'},
+    {k:'mes',l:'Este mes'},
+    {k:'3meses',l:'3 meses'},
+    {k:'año',l:'Este año'},
+    {k:'todo',l:'Todo'},
+    {k:'personalizado',l:'Personalizado'},
+  ];
+
+  var html='<div style="overflow-x:auto;white-space:nowrap;margin-bottom:12px;padding-bottom:4px">'+
+    tabLabels.map(function(t){
+      return '<button onclick="histFiltro=\''+t.k+'\';renderView()" style="display:inline-block;margin-right:6px;border:1px solid '+(histFiltro===t.k?'var(--accent)':'var(--border2)')+';background:'+(histFiltro===t.k?'var(--accent-dim)':'none')+';color:'+(histFiltro===t.k?'var(--accent)':'var(--muted)')+';border-radius:99px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">'+t.l+'</button>';
+    }).join('')+'</div>';
+
+  if(histFiltro==='personalizado'){
+    html+='<div style="display:flex;gap:8px;margin-bottom:12px">'+
+      '<div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Desde</div>'+
+      '<input type="date" class="form-input" value="'+histFechaDesde+'" onchange="histFechaDesde=this.value;renderView()" style="font-size:13px"></div>'+
+      '<div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Hasta</div>'+
+      '<input type="date" class="form-input" value="'+histFechaHasta+'" onchange="histFechaHasta=this.value;renderView()" style="font-size:13px"></div>'+
+      '</div>';
+  }
+
+  html+='<input class="search-bar" placeholder="Buscar por cliente..." value="'+histCliente+'" oninput="histCliente=this.value;renderView()" style="margin-bottom:12px">';
+
+  html+='<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:16px">'+
+    '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px;text-align:center">'+
+    '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Abonos</div>'+
+    '<div style="font-size:16px;font-weight:600;font-family:DM Mono,monospace;color:var(--green)">'+fmt(totalAbonos)+'</div></div>'+
+    '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px;text-align:center">'+
+    '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Multas</div>'+
+    '<div style="font-size:16px;font-weight:600;font-family:DM Mono,monospace;color:var(--red)">'+fmt(totalMultas)+'</div></div>'+
+    '<div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px;text-align:center">'+
+    '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Movimientos</div>'+
+    '<div style="font-size:16px;font-weight:600;font-family:DM Mono,monospace;color:var(--accent)">'+filtrados.length+'</div></div>'+
+    '</div>';
+
+  if(!filtrados.length){
+    html+='<div class="empty">Sin movimientos en este período</div>';
+    return html;
+  }
+
+  var porFecha={};
+  filtrados.forEach(function(m){
+    if(!porFecha[m.fecha])porFecha[m.fecha]=[];
+    porFecha[m.fecha].push(m);
+  });
+
+  Object.keys(porFecha).sort(function(a,b){return b.localeCompare(a);}).forEach(function(fecha){
+    var items=porFecha[fecha];
+    var diaTot=items.filter(function(m){return m.tipo==='abono';}).reduce(function(s,m){return s+m.monto;},0);
+    html+='<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin:16px 0 6px;display:flex;justify-content:space-between">'+
+      '<span>'+fmtD(fecha)+'</span>'+
+      (diaTot?'<span style="color:var(--green)">'+fmt(diaTot)+'</span>':'')+'</div>';
+    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0 16px">';
+    items.forEach(function(m){
+      var d=deudores.find(function(x){return x.id===m.deudor_id;});
+      var color=m.tipo==='abono'?'var(--green)':m.tipo==='multa'?'var(--red)':'var(--amber)';
+      var label=m.tipo==='abono'?'Abono':m.tipo==='multa'?'Multa':'Cargo';
+      var signo=m.tipo==='abono'?'-':'+';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">'+
+        '<div>'+
+        '<div style="font-size:13px;font-weight:500;cursor:pointer" onclick="navTo(\'cobros\');verDeudor(\''+(d?d.id:'')+'\')">'+( d?d.nombre:'—')+'</div>'+
+        (m.nota?'<div style="font-size:11px;color:var(--muted);font-style:italic">'+m.nota+'</div>':'')+
+        '</div>'+
+        '<div style="text-align:right">'+
+        '<div style="font-size:14px;font-weight:600;font-family:DM Mono,monospace;color:'+color+'">'+signo+fmt(m.monto)+'</div>'+
+        '<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;background:'+(m.tipo==='abono'?'var(--green-dim)':m.tipo==='multa'?'var(--red-dim)':'var(--amber-dim)')+';color:'+color+'">'+label+'</span>'+
+        '</div></div>';
+    });
+    html+='</div>';
+  });
+  return html;
 }
 
 // CONFIRM DIALOG
